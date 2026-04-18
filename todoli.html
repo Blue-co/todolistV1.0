@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interactive Animated To-Do Calendar</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
+body{font-family:'Pretendard',sans-serif;background:#0f172a;min-height:100vh;display:flex;align-items:center;justify-content:center;margin:0;overflow:hidden}
+#intro-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:#020617;display:flex;align-items:center;justify-content:center;z-index:100;transition:opacity 0.8s ease-out;perspective:1000px;overflow:hidden}
+.code-particle{position:absolute;color:#818cf8;font-family:monospace;font-size:14px;font-weight:bold;white-space:nowrap;pointer-events:none;text-shadow:0 0 12px rgba(99,102,241,0.6);opacity:0;animation:flowingCode 3s linear forwards}
+#central-message{position:absolute;color:#fff;font-size:2rem;font-weight:800;text-align:center;opacity:0;z-index:101;transition:all 0.8s ease-in-out;text-shadow:0 0 30px rgba(99,102,241,0.8);letter-spacing:0.1em}
+@keyframes flowingCode{0%{transform:translateX(-100%) translateY(0);opacity:0}10%{opacity:1}90%{opacity:1}100%{transform:translateX(120vw) translateY(20px);opacity:0}}
+.main-container{background:#1e293b;border-radius:2.5rem;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);overflow:hidden;width:100%;max-width:950px;display:flex;flex-direction:column;border:1px solid #334155;opacity:0;transform:scale(0.95);transition:all 1s cubic-bezier(0.16,1,0.3,1)}
+.main-container.show{opacity:1;transform:scale(1)}
+@media (min-width:768px){.main-container{flex-direction:row;height:650px}}
+.calendar-section{background:#1e293b;padding:2.5rem;flex:1;border-right:1px solid #334155}
+.todo-section{background:#0f172a;padding:2.5rem;flex:1.2;display:flex;flex-direction:column}
+.calendar-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.day-cell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;border-radius:16px;font-size:0.9rem;cursor:pointer;transition:all 0.3s cubic-bezier(0.34,1.56,0.64,1);position:relative;background:transparent;color:#94a3b8}
+.day-cell:hover:not(.empty){background:#334155;transform:scale(1.1);color:#fff}
+.day-cell.active{background:#4f46e5;color:white;font-weight:bold;transform:scale(1.1);box-shadow:0 10px 15px -3px rgba(79,70,229,0.4)}
+.day-cell.today{color:#818cf8;text-decoration:underline;text-underline-offset:4px;font-weight:bold}
+.click-pop{animation:pop 0.3s ease-out}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.2)}100%{transform:scale(1.1)}}
+.todo-dot{position:absolute;bottom:6px;width:5px;height:5px;background:#fb7185;border-radius:50%}
+.todo-item{animation:slideIn 0.4s cubic-bezier(0.16,1,0.3,1);background:#1e293b;border-radius:16px;padding:1.2rem;display:flex;align-items:center;gap:15px;margin-bottom:0.8rem;border:1px solid #334155}
+@keyframes slideIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.completed{text-decoration:line-through;color:#475569}
+input:focus{outline:none}
+.custom-scroll::-webkit-scrollbar{width:5px}
+.custom-scroll::-webkit-scrollbar-track{background:transparent}
+.custom-scroll::-webkit-scrollbar-thumb{background:#334155;border-radius:10px}
+#month-label{color:#f1f5f9}
+#date-title{color:#f1f5f9}
+</style>
+</head>
+<body>
+<div id="intro-overlay"><div id="central-message"></div></div>
+<div class="main-container mx-4" id="app-main">
+<div class="calendar-section">
+<div class="flex justify-between items-center mb-8">
+<h2 id="month-label" class="text-2xl font-bold tracking-tight"></h2>
+<div class="flex gap-2">
+<button onclick="moveMonth(-1)" class="w-10 h-10 rounded-xl hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500 hover:text-indigo-400"><i class="fas fa-chevron-left"></i></button>
+<button onclick="moveMonth(1)" class="w-10 h-10 rounded-xl hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500 hover:text-indigo-400"><i class="fas fa-chevron-right"></i></button>
+</div>
+</div>
+<div class="calendar-grid text-center text-[11px] font-bold text-slate-500 mb-4 uppercase tracking-widest">
+<div class="text-rose-500">Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div class="text-indigo-400">Sat</div>
+</div>
+<div id="calendar-days" class="calendar-grid"></div>
+<div class="mt-12 p-5 bg-slate-900/50 rounded-3xl flex items-center justify-between border border-slate-800">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-slate-800 rounded-2xl flex items-center justify-center shadow-sm text-indigo-400"><i class="fas fa-volume-up"></i></div>
+<div><span class="block text-[10px] font-bold text-slate-500 uppercase">Interaction</span><span class="text-sm font-bold text-slate-300">효과음 활성화</span></div>
+</div>
+<button id="sound-toggle" class="text-3xl text-indigo-500 transition-all hover:scale-110"><i class="fas fa-toggle-on"></i></button>
+</div>
+</div>
+<div class="todo-section">
+<header class="mb-8">
+<h3 id="date-title" class="text-2xl font-bold">오늘의 할 일</h3>
+<p class="text-sm text-slate-500 font-medium">달력을 눌러 날짜별 일정을 관리하세요.</p>
+</header>
+<div class="relative mb-8">
+<input type="text" id="todo-input" placeholder="새로운 목표를 입력하세요..." class="w-full py-5 pl-6 pr-14 rounded-3xl border-none shadow-inner text-slate-200 bg-slate-800 focus:ring-4 focus:ring-indigo-900/30 transition-all text-lg font-medium placeholder:text-slate-500">
+<button id="add-btn" class="absolute right-3 top-3 bottom-3 bg-indigo-600 text-white w-12 rounded-2xl hover:bg-indigo-500 transition-all shadow-lg shadow-indigo-900/20"><i class="fas fa-plus"></i></button>
+</div>
+<div id="todo-list" class="flex-1 overflow-y-auto pr-2 custom-scroll"></div>
+</div>
+</div>
+<script>
+let todos=[];let viewDate=new Date();let selectedDateStr=new Date().toISOString().split('T')[0];let soundOn=true;
+const audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+const codeSnippets=[
+"const audioCtx = new AudioContext();",
+"function playSound('select');",
+"osc.frequency.exponentialRampToValueAtTime(550, now + 0.1);",
+"renderCalendar();",
+"day-cell.click-pop { animation: pop 0.3s; }",
+"transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);",
+"todos.filter(t => t.date === selectedDateStr);",
+"gain.gain.setValueAtTime(0.3, now);",
+"class='day-cell today active'",
+"document.getElementById('app-main').classList.add('show');"
+];
+const messages=["우리는 끝없이 만듭니다", "우리는 끝없이 동반합니다", "블루타이거"];
+function createFlowingCode(){
+const overlay=document.getElementById('intro-overlay');
+for(let i=0;i<40;i++){
+setTimeout(()=>{
+const el=document.createElement('div');
+el.className='code-particle';
+el.innerText=codeSnippets[Math.floor(Math.random()*codeSnippets.length)];
+el.style.top=Math.random()*90+'%';
+el.style.left='-20%';
+el.style.animationDuration=(2.5+Math.random()*2)+'s';
+overlay.appendChild(el);
+setTimeout(()=>el.remove(),4500);
+},i*100);
+}
+}
+async function showMessages(){
+const msgEl=document.getElementById('central-message');
+for(const msg of messages){
+msgEl.innerText=msg;
+msgEl.style.opacity='1';
+msgEl.style.transform='scale(1.1)';
+await new Promise(r=>setTimeout(r,1200));
+msgEl.style.opacity='0';
+msgEl.style.transform='scale(0.9)';
+await new Promise(r=>setTimeout(r,600));
+}
+}
+function startIntro(){
+const overlay=document.getElementById('intro-overlay');
+createFlowingCode();
+showMessages().then(()=>{
+setTimeout(()=>{
+overlay.style.opacity='0';
+document.getElementById('app-main').classList.add('show');
+setTimeout(()=>overlay.remove(),800);
+},500);
+});
+}
+function playSound(type){
+if(!soundOn)return;if(audioCtx.state==='suspended')audioCtx.resume();
+const osc=audioCtx.createOscillator();const gain=audioCtx.createGain();
+osc.connect(gain);gain.connect(audioCtx.destination);const now=audioCtx.currentTime;
+if(type==='select'){osc.type='sine';osc.frequency.setValueAtTime(350,now);osc.frequency.exponentialRampToValueAtTime(550,now+0.1);gain.gain.setValueAtTime(0.3,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.12);osc.start();osc.stop(now+0.12)}
+else if(type==='add'){osc.type='triangle';osc.frequency.setValueAtTime(450,now);osc.frequency.exponentialRampToValueAtTime(900,now+0.12);gain.gain.setValueAtTime(0.25,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.2);osc.start();osc.stop(now+0.2)}
+else if(type==='done'){osc.type='sine';osc.frequency.setValueAtTime(523.25,now);osc.frequency.setValueAtTime(659.25,now+0.1);gain.gain.setValueAtTime(0.35,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.25);osc.start();osc.stop(now+0.25)}
+else if(type==='remove'){osc.type='sine';osc.frequency.setValueAtTime(800,now);osc.frequency.exponentialRampToValueAtTime(400,now+0.1);gain.gain.setValueAtTime(0.3,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.1);osc.start();osc.stop(now+0.1)}
+}
+function renderCalendar(){
+const daysContainer=document.getElementById('calendar-days');const label=document.getElementById('month-label');
+daysContainer.innerHTML='';const year=viewDate.getFullYear();const month=viewDate.getMonth();
+label.innerText=`${year}년 ${month+1}월`;const firstDay=new Date(year,month,1).getDay();const lastDate=new Date(year,month+1,0).getDate();const todayStr=new Date().toISOString().split('T')[0];
+for(let i=0;i<firstDay;i++){const empty=document.createElement('div');empty.className='day-cell empty';daysContainer.appendChild(empty)}
+for(let i=1;i<=lastDate;i++){
+const dateStr=`${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+const cell=document.createElement('div');cell.className=`day-cell ${dateStr===todayStr?'today':''} ${dateStr===selectedDateStr?'active':''}`;cell.innerText=i;
+if(todos.some(t=>t.date===dateStr)){const dot=document.createElement('div');dot.className='todo-dot';cell.appendChild(dot)}
+cell.onclick=()=>{playSound('select');cell.classList.add('click-pop');setTimeout(()=>cell.classList.remove('click-pop'),300);selectedDateStr=dateStr;document.getElementById('date-title').innerText=`${i}일의 계획`;renderCalendar();renderTodos()};
+daysContainer.appendChild(cell)}
+}
+function renderTodos(){
+const list=document.getElementById('todo-list');list.innerHTML='';const filtered=todos.filter(t=>t.date===selectedDateStr);
+if(filtered.length===0){list.innerHTML='<div class="flex flex-col items-center justify-center h-full opacity-20 py-10"><i class="fas fa-calendar-day text-5xl mb-3 text-slate-400"></i><p class="text-sm font-bold text-slate-400">계획이 없습니다</p></div>'}
+filtered.forEach(todo=>{
+const item=document.createElement('div');item.className='todo-item';
+item.innerHTML=`<button onclick="toggleTodo(${todo.id})" class="w-7 h-7 rounded-full border-2 flex items-center justify-center transition-all ${todo.completed?'bg-indigo-500 border-indigo-500 text-white':'border-slate-600 text-transparent hover:border-indigo-400'}"><i class="fas fa-check text-[11px]"></i></button><span class="flex-1 text-[15px] font-semibold text-slate-300 ${todo.completed?'completed':''}">${todo.text}</span><button onclick="removeTodo(${todo.id})" class="text-slate-500 hover:text-rose-500 transition-colors p-2"><i class="far fa-trash-alt text-sm"></i></button>`;
+list.appendChild(item)})
+}
+function moveMonth(offset){viewDate.setMonth(viewDate.getMonth()+offset);playSound('select');renderCalendar()}
+function addTodo(){const input=document.getElementById('todo-input');if(!input.value.trim())return;todos.push({id:Date.now(),text:input.value,date:selectedDateStr,completed:false});input.value='';playSound('add');renderCalendar();renderTodos()}
+function toggleTodo(id){todos=todos.map(t=>{if(t.id===id){if(!t.completed)playSound('done');return{...t,completed:!t.completed}}return t});renderTodos()}
+function removeTodo(id){todos=todos.filter(t=>t.id !==id);playSound('remove');renderCalendar();renderTodos()}
+document.getElementById('todo-input').onkeydown=(e)=>{if(e.key==='Enter')addTodo()};
+document.getElementById('add-btn').onclick=addTodo;
+document.getElementById('sound-toggle').onclick=function(){
+soundOn=!soundOn;this.innerHTML=soundOn?'<i class="fas fa-toggle-on"></i>':'<i class="fas fa-toggle-off"></i>';
+this.className=soundOn?'text-3xl text-indigo-500 transition-all hover:scale-110':'text-3xl text-slate-600 transition-all hover:scale-110';
+document.querySelector('.text-sm.font-bold.text-slate-300').innerText=soundOn?"효과음 활성화":"효과음 꺼짐";
+if(audioCtx.state==='suspended')audioCtx.resume()};
+window.onload=()=>{startIntro();renderCalendar();renderTodos()};
+</script>
+</body>
+</html>
